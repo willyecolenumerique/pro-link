@@ -286,7 +286,7 @@ def prepare_ml_data(df_input):
     numerical_features = [
         'Quantity_Sold', 'Unit_Cost', 'Unit_Price', 'Discount',
         'Year', 'Month', 'Day', 'DayOfWeek', 'DayOfYear', 'Week',
-        'Total_Cost', 'Profi', 'Profi_Margin'
+        'Total_Cost', 'Profi', 'Profi_Marge'
     ]
     encoded_features = [f"{col}_encoded" for col in categorical_cols]
     
@@ -549,7 +549,7 @@ if "Accueil" in nav_selection:
     
     total_sales = df_filtered['Sales_Amount'].sum()
     total_Profi = df_filtered['Profi'].sum()
-    avg_margin = df_filtered['Profi_Margin'].mean()
+    avg_margin = df_filtered['Profi_Marge'].mean()
     total_transactions = len(df_filtered)
     
     quick_col1.metric("Ventes Totales", f"${total_sales:,.0f}")
@@ -902,7 +902,7 @@ elif "Machine Learning" in nav_selection:
                                 'Discount': [discount],
                                 'Total_Cost': [quantity * unit_cost],
                                 'Profi': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
-                                'Profi_Margin': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
+                                'Profi_Marge': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
                                 
                                 # Features temporelles
                                 'Year': [current_date.year],
