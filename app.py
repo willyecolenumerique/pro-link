@@ -35,16 +35,16 @@ st.markdown("""
 
     /* VARIABLES DE COULEURS */
     :root {
-        --bg-color: #F0F2F5;
+        --bg-color: #FFFFFFF;
         --sidebar-bg: #2C3E50; /* Bleu nuit profond */
-        --card-bg: #FFFFFF;
+        --card-bg: #D9C8A0;
         --primary: #3498DB;
         --secondary: #9B59B6;
         --success: #2ECC71;
         --warning: #F1C40F;
         --danger: #E74C3C;
         --text-dark: #2C3E50;
-        --text-light: #95A5A6;
+        --text-light: #000000;
         --card-radius: 16px;
         --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
         --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
@@ -221,7 +221,7 @@ def generate_dummy_data():
                 'Quantity_Sold': qty,
                 'Unit_Price': price,
                 'Discount': discount,
-                'Profit': (price * qty * (1 - discount)) * np.random.uniform(0.1, 0.4), # Profit ~10-40%
+                'Profi': (price * qty * (1 - discount)) * np.random.uniform(0.1, 0.4), # Profi ~10-40%
                 'Sales_Rep': f"Rep_{np.random.randint(1, 20)}"
             })
     
@@ -249,8 +249,8 @@ df = load_data()
 
 # Calculs globaux pour réutilisation
 total_sales = df['Sales_Amount'].sum()
-total_profit = df['Profit'].sum()
-avg_margin = (total_profit / total_sales) * 100
+total_Profi = df['Profi'].sum()
+avg_margin = (total_Profi / total_sales) * 100
 current_date = df['Sale_Date'].max()
 
 # -----------------------------------------------------------------------------
@@ -376,8 +376,8 @@ if "Tableau de Bord" in nav_selection:
     with col2:
         card_metric("Commandes", f"{len(df_filtered):,}", -2.4)
     with col3:
-        profit = df_filtered['Profit'].sum()
-        margin = (profit / df_filtered['Sales_Amount'].sum()) * 100
+        Profi = df_filtered['Profi'].sum()
+        margin = (Profi / df_filtered['Sales_Amount'].sum()) * 100
         card_metric("Marge Nette", f"{margin:.1f}", 5.3, suffix="%")
     with col4:
         avg_basket = df_filtered['Sales_Amount'].mean()
@@ -388,7 +388,7 @@ if "Tableau de Bord" in nav_selection:
     
     with col_main:
         def plot_sales_trend(height):
-            daily = df_filtered.groupby('Sale_Date')[['Sales_Amount', 'Profit']].sum().reset_index()
+            daily = df_filtered.groupby('Sale_Date')[['Sales_Amount', 'Profi']].sum().reset_index()
             daily['MA7'] = daily['Sales_Amount'].rolling(7).mean()
             
             fig = go.Figure()
@@ -399,10 +399,10 @@ if "Tableau de Bord" in nav_selection:
                 line=dict(color='#3498DB', width=1),
                 fillcolor='rgba(52, 152, 219, 0.1)'
             ))
-            # Ligne de tendance (Profit)
+            # Ligne de tendance (Profi)
             fig.add_trace(go.Scatter(
-                x=daily['Sale_Date'], y=daily['Profit'],
-                mode='lines', name='Profit',
+                x=daily['Sale_Date'], y=daily['Profi'],
+                mode='lines', name='Profi',
                 line=dict(color='#2ECC71', width=2)
             ))
             
@@ -416,7 +416,7 @@ if "Tableau de Bord" in nav_selection:
             )
             st.plotly_chart(fig, use_container_width=True)
             
-        card_chart_wrapper("Évolution Ventes & Profit (YTD)", plot_sales_trend, height=380)
+        card_chart_wrapper("Évolution Ventes & Profi (YTD)", plot_sales_trend, height=380)
 
     with col_side:
         # Liste stylisée des meilleures catégories
@@ -484,8 +484,8 @@ elif "Analyse Détaillée" in nav_selection:
             card_chart_wrapper("Distribution des Prix Unitaires", 
                                lambda height: st.plotly_chart(px.histogram(df_filtered, x="Unit_Price", nbins=30, color_discrete_sequence=['#3498DB']).update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
         with col2:
-            card_chart_wrapper("Distribution des Profits", 
-                               lambda height: st.plotly_chart(px.box(df_filtered, x="Product_Category", y="Profit", color="Product_Category").update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
+            card_chart_wrapper("Distribution des Profis", 
+                               lambda height: st.plotly_chart(px.box(df_filtered, x="Product_Category", y="Profi", color="Product_Category").update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
     
     with tabs[1]:
         # Heatmap de corrélation
@@ -503,7 +503,7 @@ elif "Analyse Détaillée" in nav_selection:
         # Scatter Plot interactif
         col_x, col_y, col_c = st.columns(3)
         with col_x: x_axis = st.selectbox("Axe X", numeric_cols, index=0)
-        with col_y: y_axis = st.selectbox("Axe Y", numeric_cols, index=4) # Profit default
+        with col_y: y_axis = st.selectbox("Axe Y", numeric_cols, index=4) # Profi default
         with col_c: color_var = st.selectbox("Couleur", ['Region', 'Product_Category'])
         
         fig = px.scatter(df_filtered, x=x_axis, y=y_axis, color=color_var, size='Quantity_Sold', 
@@ -559,14 +559,14 @@ elif "Géographie & Segments" in nav_selection:
         st.caption("Vue hiérarchique Région > Catégorie")
         
         fig_tree = px.treemap(df_filtered, path=['Region', 'Product_Category'], values='Sales_Amount',
-                              color='Profit', color_continuous_scale='RdBu')
+                              color='Profi', color_continuous_scale='RdBu')
         fig_tree.update_layout(height=500)
         st.plotly_chart(fig_tree, use_container_width=True)
         
     # Sunburst Chart
     st.markdown("---")
     st.subheader("Vue Radiale des Ventes")
-    fig_sun = px.sunburst(df_filtered, path=['Region', 'Product_Category', 'Region_and_Sales_Rep'], values='Sales_Amount', color='Profit')
+    fig_sun = px.sunburst(df_filtered, path=['Region', 'Product_Category', 'Region_and_Sales_Rep'], values='Sales_Amount', color='Profi')
     fig_sun.update_layout(height=600)
     st.plotly_chart(fig_sun, use_container_width=True)
 
@@ -577,7 +577,7 @@ elif "Simulateur IA" in nav_selection:
     st.markdown("""
     <div class="nexus-card">
         <h3 style="color:var(--primary)">🔮 Simulateur de Scénarios</h3>
-        <p>Modifiez les paramètres ci-dessous pour voir l'impact projeté sur la marge et le profit global.</p>
+        <p>Modifiez les paramètres ci-dessous pour voir l'impact projeté sur la marge et le Profi global.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -600,8 +600,8 @@ elif "Simulateur IA" in nav_selection:
     with col_res:
         # Logique de simulation
         base_sales = df_filtered['Sales_Amount'].sum()
-        base_profit = df_filtered['Profit'].sum()
-        base_cost = base_sales - base_profit
+        base_Profi = df_filtered['Profi'].sum()
+        base_cost = base_sales - base_Profi
         
         # Application scénario
         new_sales_vol_factor = 1 + ((sim_vol_change + (sim_price_change * elasticity))/100)
@@ -610,7 +610,7 @@ elif "Simulateur IA" in nav_selection:
         
         projected_sales = base_sales * new_sales_vol_factor * new_price_factor
         projected_costs = base_cost * new_sales_vol_factor * new_cost_factor
-        projected_profit = projected_sales - projected_costs
+        projected_Profi = projected_sales - projected_costs
         
         # Affichage résultats
         c1, c2, c3 = st.columns(3)
@@ -619,16 +619,16 @@ elif "Simulateur IA" in nav_selection:
         with c2:
             st.metric("Coûts Projetés", f"${projected_costs:,.0f}", f"{(projected_costs/base_cost - 1)*100:.1f}%", delta_color="inverse")
         with c3:
-            st.metric("Profit Projeté", f"${projected_profit:,.0f}", f"{(projected_profit/base_profit - 1)*100:.1f}%")
+            st.metric("Profi Projeté", f"${projected_Profi:,.0f}", f"{(projected_Profi/base_Profi - 1)*100:.1f}%")
             
         # Graphique Waterfall
         fig = go.Figure(go.Waterfall(
             name = "20", orientation = "v",
             measure = ["relative", "relative", "relative", "total"],
-            x = ["Base Profit", "Impact Prix/Vol", "Impact Coûts", "Nouveau Profit"],
+            x = ["Base Profi", "Impact Prix/Vol", "Impact Coûts", "Nouveau Profi"],
             textposition = "outside",
-            text = [f"{base_profit/1000:.0f}k", "", "", f"{projected_profit/1000:.0f}k"],
-            y = [base_profit, projected_sales - base_sales - (projected_costs - base_cost) + (projected_costs - base_cost), -(projected_costs - base_cost), projected_profit],
+            text = [f"{base_Profi/1000:.0f}k", "", "", f"{projected_Profi/1000:.0f}k"],
+            y = [base_Profi, projected_sales - base_sales - (projected_costs - base_cost) + (projected_costs - base_cost), -(projected_costs - base_cost), projected_Profi],
             connector = {"line":{"color":"rgb(63, 63, 63)"}},
         ))
         fig.update_layout(title = "Analyse d'impact du scénario (Waterfall)", height=400)
