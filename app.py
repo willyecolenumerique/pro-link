@@ -10,6 +10,14 @@ import json
 from datetime import datetime, timedelta
 import warnings
 import time
+import textwrap
+
+# ML Imports
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 # Ignorer les warnings pour une UI propre
 warnings.filterwarnings('ignore')
@@ -35,9 +43,9 @@ st.markdown("""
 
     /* VARIABLES DE COULEURS */
     :root {
-        --bg-color: #FFFFFFF;
+        --bg-color: #ffffff;
         --sidebar-bg: #2C3E50; /* Bleu nuit profond */
-        --card-bg: #D9C8A0;
+        --card-bg: #D9CBA0;
         --primary: #3498DB;
         --secondary: #9B59B6;
         --success: #2ECC71;
@@ -253,6 +261,57 @@ total_Profi = df['Profi'].sum()
 avg_margin = (total_Profi / total_sales) * 100
 current_date = df['Sale_Date'].max()
 
+@st.cache_data
+def prepare_ml_data(df_input):
+    """Prépare les données pour le ML comme dans le notebook"""
+    df_ml = df_input.copy()
+    
+    # Features temporelles
+    df_ml['Year'] = df_ml['Sale_Date'].dt.year
+    df_ml['Month'] = df_ml['Sale_Date'].dt.month
+    df_ml['Day'] = df_ml['Sale_Date'].dt.day
+    df_ml['DayOfWeek'] = df_ml['Sale_Date'].dt.dayofweek
+    df_ml['DayOfYear'] = df_ml['Sale_Date'].dt.dayofyear
+    df_ml['Week'] = df_ml['Sale_Date'].dt.isocalendar().week
+    
+    # Encodage
+    categorical_cols = ['Region', 'Sales_Rep', 'Product_Category', 'Customer_Type', 'Payment_Method', 'Sales_Channel', 'Region_and_Sales_Rep']
+    encoders = {}
+    for col in categorical_cols:
+        le = LabelEncoder()
+        df_ml[f"{col}_encoded"] = le.fit_transform(df_ml[col].astype(str))
+        encoders[col] = le
+        
+    # Features selection
+    numerical_features = [
+        'Quantity_Sold', 'Unit_Cost', 'Unit_Price', 'Discount',
+        'Year', 'Month', 'Day', 'DayOfWeek', 'DayOfYear', 'Week',
+        'Total_Cost', 'Profi', 'Profi_Margin'
+    ]
+    encoded_features = [f"{col}_encoded" for col in categorical_cols]
+    
+    features = numerical_features + encoded_features
+    
+    # Clean NaN/Inf
+    X = df_ml[features].replace([np.inf, -np.inf], np.nan).fillna(0)
+    y = df_ml['Sales_Amount']
+    
+    return X, y, features, encoders, df_ml
+
+@st.cache_data
+def get_encoders_from_data(df):
+    """Crée les encodeurs à partir des données pour la prédiction"""
+    encoders = {}
+    categorical_cols = ['Region', 'Product_Category', 'Customer_Type', 'Payment_Method', 'Sales_Channel']
+    
+    for col in categorical_cols:
+        if col in df.columns:
+            le = LabelEncoder()
+            le.fit(df[col].astype(str))
+            encoders[col] = le
+    
+    return encoders
+
 # -----------------------------------------------------------------------------
 # 4. COMPOSANTS UI RÉUTILISABLES
 # -----------------------------------------------------------------------------
@@ -306,7 +365,8 @@ with st.sidebar:
     nav_selection = st.radio(
         "NAVIGATION",
         [
-            "🏠 Tableau de Bord", 
+            "🏠 Accueil",
+            "📊 Tableau de Bord", 
             "📉 Analyse Détaillée", 
             "🗺️ Géographie & Segments", 
             "🔮 Simulateur IA", 
@@ -363,9 +423,144 @@ if df_filtered.empty:
     st.stop()
 
 # =============================================================================
-# PAGE 1: TABLEAU DE BORD (DASHBOARD)
+# PAGE 0: ACCUEIL
 # =============================================================================
-if "Tableau de Bord" in nav_selection:
+if "Accueil" in nav_selection:
+    # Hero Section - Design sobre et professionnel
+    st.markdown("""
+        <div style="padding: 80px 40px 60px 40px; background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%); 
+                    border-radius: 2px; margin-bottom: 50px; color: white; border-left: 4px solid #3498DB;">
+            <h1 style="font-size: 38px; margin: 0; font-weight: 300; letter-spacing: 3px;">NEXUS ANALYTICS</h1>
+            <p style="font-size: 15px; margin-top: 15px; opacity: 0.85; font-weight: 300; letter-spacing: 1px;">
+                Business Intelligence & Predictive Analytics Platform
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Introduction
+    st.markdown("""
+        <div style="max-width: 900px; margin: 0 auto 60px auto; padding: 0 20px;">
+            <h2 style="color: #2C3E50; margin-bottom: 25px; font-weight: 400; font-size: 26px;">
+                Plateforme d'Analyse Décisionnelle
+            </h2>
+            <p style="font-size: 16px; color: #5D6D7E; line-height: 1.9; text-align: justify;">
+                NEXUS Analytics est une solution d'analyse de données de ventes intégrant des capacités avancées 
+                de Machine Learning et de prévision. Cette plateforme permet d'explorer les données historiques, 
+                d'identifier les tendances clés et d'anticiper les performances futures grâce à des modèles prédictifs.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Fonctionnalités principales - Design sobre
+    st.markdown("""
+        <h2 style='color: #2C3E50; margin: 60px 0 40px 0; font-weight: 400; font-size: 24px; 
+                   border-bottom: 2px solid #ECF0F1; padding-bottom: 15px;'>Modules Disponibles</h2>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #3498DB;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Tableau de Bord</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Visualisation en temps réel des indicateurs clés de performance : 
+                    chiffre d'affaires, marges, volumes. Graphiques interactifs et KPIs dynamiques.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #9B59B6;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Analyse Approfondie</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Exploration détaillée par produit, représentant commercial et période. 
+                    Analyse de corrélations et identification des tendances saisonnières.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #E74C3C;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Analyse Géographique</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Cartographie des performances par région et segmentation client. 
+                    Analyse Pareto et identification des zones à fort potentiel.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='margin: 25px 0;'></div>", unsafe_allow_html=True)
+    
+    col4, col5, col6 = st.columns(3)
+    
+    with col4:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #1ABC9C;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Simulateur de Scénarios</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Modélisation what-if pour tester l'impact de variations de prix, volumes et coûts. 
+                    Analyse d'élasticité et projections financières.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col5:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #F39C12;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Prédiction ML</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Modèles de Machine Learning pré-entraînés pour la prédiction des ventes. 
+                    Forecasting sur 7 à 90 jours avec métriques de confiance.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col6:
+        st.markdown("""
+            <div class="nexus-card" style="padding: 35px; border-left: 3px solid #34495E;">
+                <h3 style="color: #2C3E50; margin-bottom: 15px; font-size: 18px; font-weight: 500;">Export & Rapports</h3>
+                <p style="color: #7F8C8D; line-height: 1.7; font-size: 14px;">
+                    Génération de rapports personnalisés et export des données filtrées. 
+                    Formats CSV et Excel pour intégration externe.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    # Call to Action
+    st.markdown("""
+        <div style="text-align: center; margin: 70px 0 50px 0; padding: 40px; background: #F8F9FA; border-radius: 2px;">
+            <h3 style="color: #2C3E50; margin-bottom: 15px; font-weight: 400; font-size: 20px;">Démarrer l'Analyse</h3>
+            <p style="font-size: 15px; color: #7F8C8D; margin-bottom: 0;">
+                Utilisez le menu de navigation latéral pour accéder aux différents modules d'analyse
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Stats rapides
+    st.markdown("""
+        <h3 style='color: #2C3E50; margin: 50px 0 25px 0; font-weight: 400; font-size: 22px; 
+                   border-bottom: 2px solid #ECF0F1; padding-bottom: 15px;'>Indicateurs Globaux</h3>
+    """, unsafe_allow_html=True)
+    
+    quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
+    
+    total_sales = df_filtered['Sales_Amount'].sum()
+    total_Profi = df_filtered['Profi'].sum()
+    avg_margin = df_filtered['Profi_Margin'].mean()
+    total_transactions = len(df_filtered)
+    
+    quick_col1.metric("Ventes Totales", f"${total_sales:,.0f}")
+    quick_col2.metric("Profi Total", f"${total_Profi:,.0f}")
+    quick_col3.metric("Marge Moyenne", f"{avg_margin:.1f}%")
+    quick_col4.metric("Transactions", f"{total_transactions:,}")
+
+# =============================================================================
+# PAGE 1: TABLEAU DE BORD (SUMMARY)
+# =============================================================================
+elif "Tableau de Bord" in nav_selection:
     
     # --- Ligne 1: KPIs ---
     col1, col2, col3, col4 = st.columns(4)
@@ -420,17 +615,19 @@ if "Tableau de Bord" in nav_selection:
 
     with col_side:
         # Liste stylisée des meilleures catégories
-        st.markdown('<div class="nexus-card animate-fade-in" style="height: 456px;">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Performance Catégories</div>', unsafe_allow_html=True)
-        
         cat_perf = df_filtered.groupby('Product_Category')['Sales_Amount'].sum().sort_values(ascending=False)
         max_val = cat_perf.max()
+        
+        html_content = textwrap.dedent(f"""
+            <div class="nexus-card animate-fade-in" style="height: 456px;">
+                <div class="card-title">Performance Catégories</div>
+        """)
         
         for cat, val in cat_perf.items():
             pct = (val / max_val) * 100
             color = "#3498DB" if pct > 75 else "#9B59B6" if pct > 40 else "#95A5A6"
             
-            st.markdown(f"""
+            html_content += textwrap.dedent(f"""
                 <div style="margin-bottom: 20px;">
                     <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px; font-weight:500;">
                         <span>{cat}</span>
@@ -440,8 +637,10 @@ if "Tableau de Bord" in nav_selection:
                         <div style="width:{pct}%; background:{color}; height:6px; border-radius:3px; transition: width 1s ease;"></div>
                     </div>
                 </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            """)
+            
+        html_content += "</div>"
+        st.markdown(html_content, unsafe_allow_html=True)
 
     # --- Ligne 3: Répartition ---
     c1, c2 = st.columns(2)
@@ -638,52 +837,204 @@ elif "Simulateur IA" in nav_selection:
 # PAGE 5: MACHINE LEARNING (SUMMARY)
 # =============================================================================
 elif "Machine Learning" in nav_selection:
-    st.subheader("🤖 Centre de Modélisation Prédictive")
+    st.subheader("🤖 Centre de Prédiction ML")
     
-    # Simulation de chargement de modèle si les fichiers n'existent pas
-    col1, col2 = st.columns([2, 1])
+    tabs = st.tabs(["🎯 Prédictions", "📈 Prévisions (Forecasting)"])
     
-    with col1:
-        st.markdown('<div class="nexus-card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Performance des Modèles (Benchmarking)</div>', unsafe_allow_html=True)
+    # Charger le modèle pré-entraîné
+    model_path = Path("output/models/best_model_gradientboosting.joblib")
+    scaler_path = Path("output/models/scaler.joblib")
+    
+    with tabs[0]:
+        st.markdown("### 🔮 Prédiction de Ventes avec Modèle Pré-entraîné")
         
-        # Données factices pour le graphique si pas de JSON
-        models_data = pd.DataFrame({
-            'Model': ['Random Forest', 'XGBoost', 'Linear Regression', 'SVR'],
-            'R2 Score': [0.89, 0.92, 0.75, 0.81],
-            'MAE': [120, 95, 210, 150],
-            'Training Time (s)': [4.5, 6.2, 0.5, 12.1]
-        })
+        if model_path.exists() and scaler_path.exists():
+            try:
+                # Charger le modèle et le scaler
+                model = joblib.load(model_path)
+                scaler = joblib.load(scaler_path)
+                
+                st.success("✅ Modèle GradientBoosting chargé avec succès !")
+                
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    st.markdown('<div class="nexus-card">', unsafe_allow_html=True)
+                    st.markdown("#### 📝 Paramètres de Prédiction")
+                    
+                    # Inputs pour la prédiction
+                    quantity = st.number_input("Quantité Vendue", min_value=1, max_value=1000, value=10)
+                    unit_price = st.number_input("Prix Unitaire ($)", min_value=1.0, max_value=10000.0, value=100.0)
+                    unit_cost = st.number_input("Coût Unitaire ($)", min_value=1.0, max_value=10000.0, value=50.0)
+                    discount = st.slider("Remise (%)", 0.0, 50.0, 5.0)
+                    
+                    region = st.selectbox("Région", df_filtered['Region'].unique())
+                    category = st.selectbox("Catégorie Produit", df_filtered['Product_Category'].unique())
+                    customer_type = st.selectbox("Type Client", df_filtered['Customer_Type'].unique())
+                    
+                    predict_button = st.button("🚀 Prédire les Ventes", type="primary")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                with col2:
+                    if predict_button:
+                        with st.spinner('Calcul de la prédiction...'):
+                            # Créer les encodeurs à partir des données
+                            encoders = get_encoders_from_data(df)
+                            
+                            # Encoder les valeurs sélectionnées
+                            try:
+                                region_encoded = encoders['Region'].transform([str(region)])[0] if 'Region' in encoders else 0
+                                category_encoded = encoders['Product_Category'].transform([str(category)])[0] if 'Product_Category' in encoders else 0
+                                customer_encoded = encoders['Customer_Type'].transform([str(customer_type)])[0] if 'Customer_Type' in encoders else 0
+                            except:
+                                region_encoded = 0
+                                category_encoded = 0
+                                customer_encoded = 0
+                            
+                            # Préparer les features avec TOUTES les colonnes nécessaires
+                            current_date = datetime.now()
+                            
+                            X_pred = pd.DataFrame({
+                                # Features numériques de base
+                                'Quantity_Sold': [quantity],
+                                'Unit_Cost': [unit_cost],
+                                'Unit_Price': [unit_price],
+                                'Discount': [discount],
+                                'Total_Cost': [quantity * unit_cost],
+                                'Profi': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
+                                'Profi_Margin': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
+                                
+                                # Features temporelles
+                                'Year': [current_date.year],
+                                'Month': [current_date.month],
+                                'Day': [current_date.day],
+                                'DayOfWeek': [current_date.weekday()],
+                                'DayOfYear': [current_date.timetuple().tm_yday],
+                                'Week': [current_date.isocalendar()[1]],
+                                
+                                # Features catégorielles encodées (VRAIES valeurs encodées)
+                                'Region_encoded': [region_encoded],
+                                'Sales_Rep_encoded': [0],  # Pas sélectionné par l'utilisateur
+                                'Product_Category_encoded': [category_encoded],
+                                'Customer_Type_encoded': [customer_encoded],
+                                'Payment_Method_encoded': [0],  # Valeur par défaut
+                                'Sales_Channel_encoded': [0],  # Valeur par défaut
+                                'Region_and_Sales_Rep_encoded': [0],  # Valeur par défaut
+                                
+                                # Feature supplémentaire
+                                'Cum_Sales_By_Point': [0]
+                            })
+                            
+                            # Prédiction
+                            try:
+                                prediction = model.predict(X_pred)[0]
+                                
+                                # Afficher le résultat
+                                st.markdown(f"""
+                                    <div class="nexus-card" style="text-align: center; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                        <h2 style="margin: 0; color: white;">Prédiction de Ventes</h2>
+                                        <div style="font-size: 48px; font-weight: 700; margin: 20px 0;">${prediction:,.2f}</div>
+                                        <p style="opacity: 0.9; margin: 0;">Montant estimé basé sur le modèle ML</p>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Détails supplémentaires
+                                st.markdown("#### 📊 Détails de la Transaction")
+                                detail_col1, detail_col2, detail_col3 = st.columns(3)
+                                
+                                revenue = quantity * unit_price * (1 - discount/100)
+                                cost = quantity * unit_cost
+                                Profi = revenue - cost
+                                margin = (Profi / revenue * 100) if revenue > 0 else 0
+                                
+                                detail_col1.metric("Revenu Calculé", f"${revenue:,.2f}")
+                                detail_col2.metric("Profi Estimé", f"${Profi:,.2f}")
+                                detail_col3.metric("Marge", f"{margin:.1f}%")
+                                
+                            except Exception as e:
+                                st.error(f"Erreur lors de la prédiction: {str(e)}")
+                    else:
+                        st.info("👈 Configurez les paramètres et cliquez sur 'Prédire les Ventes'")
+                        st.markdown("""
+                            <div style="text-align: center; padding: 50px; color: #95A5A6;">
+                                <h3>Modèle Prêt</h3>
+                                <p>Le modèle GradientBoosting pré-entraîné est chargé et prêt à faire des prédictions.</p>
+                                <p>Ajustez les paramètres à gauche pour obtenir une estimation.</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+            except Exception as e:
+                st.error(f"Erreur lors du chargement du modèle: {str(e)}")
+        else:
+            st.warning("⚠️ Modèle pré-entraîné non trouvé. Veuillez vérifier le dossier 'output/models/'.")
+    
+    with tabs[1]:
+        st.markdown("### 🔮 Prévision des Ventes")
         
-        fig = px.bar(models_data, y='Model', x='R2 Score', color='R2 Score', 
-                     orientation='h', color_continuous_scale='Viridis', text_auto=True)
-        fig.update_layout(xaxis_range=[0, 1])
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Slider pour choisir le nombre de jours
+        col_slider, col_button = st.columns([3, 1])
+        with col_slider:
+            forecast_days = st.slider("Nombre de jours à prévoir", min_value=7, max_value=90, value=30, step=7)
+        with col_button:
+            st.markdown("<br>", unsafe_allow_html=True)
+            generate_forecast = st.button("🚀 Générer les prévisions", type="primary")
         
-        # Feature Importance (Simulée)
-        st.markdown('<div class="nexus-card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Importance des Variables (Feature Importance)</div>', unsafe_allow_html=True)
-        feat_imp = pd.DataFrame({
-            'Feature': ['Discount', 'Unit_Price', 'Region_Europe', 'Category_Tech', 'Month', 'DayOfWeek'],
-            'Importance': [0.45, 0.30, 0.10, 0.08, 0.05, 0.02]
-        })
-        fig_imp = px.bar(feat_imp, x='Importance', y='Feature', orientation='h')
-        st.plotly_chart(fig_imp, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col2:
-        st.markdown('<div class="nexus-card" style="background: #2C3E50; color: white;">', unsafe_allow_html=True)
-        st.markdown('<h3 style="color:white">Modèle Actif</h3>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:40px; font-weight:bold; color:#2ECC71">XGBoost</div>', unsafe_allow_html=True)
-        st.markdown("v2.1.0 • Entraîné hier")
-        st.markdown("---")
-        st.markdown("**Précision Globale:** 92%")
-        st.markdown("**Erreur Moyenne:** $95")
-        st.button("🔄 Ré-entraîner", type="primary")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.info("Le modèle détecte que 'Discount' est le facteur prédictif #1 pour le volume de ventes ce mois-ci.")
+        if generate_forecast:
+            with st.spinner(f"Calcul des prévisions pour {forecast_days} jours..."):
+                # Simple Forecasting logic based on aggregated daily data
+                daily_data = df_filtered.groupby('Sale_Date')['Sales_Amount'].sum().reset_index()
+                daily_data['DayOfYear'] = daily_data['Sale_Date'].dt.dayofyear
+                daily_data['Year'] = daily_data['Sale_Date'].dt.year
+                daily_data['DayOfWeek'] = daily_data['Sale_Date'].dt.dayofweek
+                
+                # Features for forecast
+                X_ts = daily_data[['DayOfYear', 'Year', 'DayOfWeek']]
+                y_ts = daily_data['Sales_Amount']
+                
+                # Train Forecast Model
+                ts_model = GradientBoostingRegressor(n_estimators=200, random_state=42)
+                ts_model.fit(X_ts, y_ts)
+                
+                # Future Dates (utiliser forecast_days)
+                last_date = daily_data['Sale_Date'].max()
+                future_dates = [last_date + timedelta(days=x) for x in range(1, forecast_days + 1)]
+                future_df = pd.DataFrame({'Sale_Date': future_dates})
+                future_df['DayOfYear'] = future_df['Sale_Date'].dt.dayofyear
+                future_df['Year'] = future_df['Sale_Date'].dt.year
+                future_df['DayOfWeek'] = future_df['Sale_Date'].dt.dayofweek
+                
+                # Predict
+                future_pred = ts_model.predict(future_df[['DayOfYear', 'Year', 'DayOfWeek']])
+                future_df['Predicted_Sales'] = future_pred
+                
+                # Métriques de prévision
+                total_forecast = future_df['Predicted_Sales'].sum()
+                avg_daily_forecast = future_df['Predicted_Sales'].mean()
+                
+                metric_col1, metric_col2, metric_col3 = st.columns(3)
+                metric_col1.metric("📅 Période", f"{forecast_days} jours")
+                metric_col2.metric("💰 Total Prévu", f"${total_forecast:,.0f}")
+                metric_col3.metric("📊 Moyenne/Jour", f"${avg_daily_forecast:,.0f}")
+                
+                # Plot
+                fig_forecast = go.Figure()
+                fig_forecast.add_trace(go.Scatter(x=daily_data['Sale_Date'], y=daily_data['Sales_Amount'], 
+                                                  mode='lines', name='Historique', line=dict(color='#3498DB')))
+                fig_forecast.add_trace(go.Scatter(x=future_df['Sale_Date'], y=future_df['Predicted_Sales'], 
+                                                  mode='lines+markers', name='Prévision', 
+                                                  line=dict(dash='dash', color='#2ECC71')))
+                
+                fig_forecast.update_layout(
+                    title=f"Prévision des Ventes - {forecast_days} prochains jours", 
+                    hovermode="x unified", 
+                    height=500
+                )
+                st.plotly_chart(fig_forecast, use_container_width=True)
+                
+                # Afficher le tableau avec scroll si beaucoup de jours
+                st.markdown("#### 📋 Détail des Prévisions")
+                st.dataframe(future_df[['Sale_Date', 'Predicted_Sales']].style.format({'Predicted_Sales': '${:,.2f}'}), 
+                           use_container_width=True, height=300)
 
 # =============================================================================
 # PAGE 6: RAPPORTS ET DONNÉES
@@ -728,6 +1079,6 @@ elif "Rapports & Données" in nav_selection:
 st.markdown("""
     <div style="text-align: center; margin-top: 50px; padding: 20px; border-top: 1px solid #E0E0E0; color: #95A5A6; font-size: 12px;">
         © 2025 Nexus Analytics Corporation. All rights reserved.<br>
-        Designed with ❤️ using Streamlit & Plotly.
+        Designed by Kenfack Karled using Streamlit & Plotly.
     </div>
 """, unsafe_allow_html=True)
