@@ -1,4 +1,4 @@
-# README Complet – **Nexus Analytics Pro**
+# **Nexus Analytics Pro**
 
 _Dashboard analytique avancé – Streamlit + Plotly + IA_
 
@@ -43,7 +43,7 @@ joblib
 
 ```bash
 # 1. Cloner ou télécharger le projet
-git clone https://github.com/tonpseudo/nexus-analytics-pro.git
+git clone https://github.com/willyecolenumerique/pro-link.git
 cd nexus-analytics-pro
 
 # 2. Créer un environnement virtuel (recommandé)
