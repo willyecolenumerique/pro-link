@@ -894,35 +894,32 @@ elif "Machine Learning" in nav_selection:
                             # Préparer les features avec TOUTES les colonnes nécessaires
                             current_date = datetime.now()
                             
+                            # Ordre exact des features comme dans prepare_ml_data
                             X_pred = pd.DataFrame({
-                                # Features numériques de base
+                                # Numerical features (dans l'ordre exact)
                                 'Quantity_Sold': [quantity],
                                 'Unit_Cost': [unit_cost],
                                 'Unit_Price': [unit_price],
                                 'Discount': [discount],
-                                'Total_Cost': [quantity * unit_cost],
-                                'Profi': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
-                                'Profi_Marge': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
-                                
-                                # Features temporelles
                                 'Year': [current_date.year],
                                 'Month': [current_date.month],
                                 'Day': [current_date.day],
                                 'DayOfWeek': [current_date.weekday()],
                                 'DayOfYear': [current_date.timetuple().tm_yday],
                                 'Week': [current_date.isocalendar()[1]],
+                                'Total_Cost': [quantity * unit_cost],
+                                'Profi': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
+                                'Profi_Marge': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
+                                'Cum_Sales_By_Point': [0],
                                 
-                                # Features catégorielles encodées (VRAIES valeurs encodées)
+                                # Encoded features (dans l'ordre exact)
                                 'Region_encoded': [region_encoded],
-                                'Sales_Rep_encoded': [0],  # Pas sélectionné par l'utilisateur
+                                'Sales_Rep_encoded': [0],
                                 'Product_Category_encoded': [category_encoded],
                                 'Customer_Type_encoded': [customer_encoded],
-                                'Payment_Method_encoded': [0],  # Valeur par défaut
-                                'Sales_Channel_encoded': [0],  # Valeur par défaut
-                                'Region_and_Sales_Rep_encoded': [0],  # Valeur par défaut
-                                
-                                # Feature supplémentaire
-                                'Cum_Sales_By_Point': [0]
+                                'Payment_Method_encoded': [0],
+                                'Sales_Channel_encoded': [0],
+                                'Region_and_Sales_Rep_encoded': [0]
                             })
                             
                             # Prédiction
