@@ -229,7 +229,7 @@ def generate_dummy_data():
                 'Quantity_Sold': qty,
                 'Unit_Price': price,
                 'Discount': discount,
-                'Profi': (price * qty * (1 - discount)) * np.random.uniform(0.1, 0.4), # Profi ~10-40%
+                'Profit': (price * qty * (1 - discount)) * np.random.uniform(0.1, 0.4), # Profit ~10-40%
                 'Sales_Rep': f"Rep_{np.random.randint(1, 20)}"
             })
     
@@ -257,8 +257,8 @@ df = load_data()
 
 # Calculs globaux pour réutilisation
 total_sales = df['Sales_Amount'].sum()
-total_Profi = df['Profi'].sum()
-avg_margin = (total_Profi / total_sales) * 100
+total_Profit = df['Profit'].sum()
+avg_margin = (total_Profit / total_sales) * 100
 current_date = df['Sale_Date'].max()
 
 @st.cache_data
@@ -286,7 +286,7 @@ def prepare_ml_data(df_input):
     numerical_features = [
         'Quantity_Sold', 'Unit_Cost', 'Unit_Price', 'Discount',
         'Year', 'Month', 'Day', 'DayOfWeek', 'DayOfYear', 'Week',
-        'Total_Cost', 'Profi', 'Profi_Marge'
+        'Total_Cost', 'Profit', 'Profit_Margin'
     ]
     encoded_features = [f"{col}_encoded" for col in categorical_cols]
     
@@ -548,12 +548,12 @@ if "Accueil" in nav_selection:
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     
     total_sales = df_filtered['Sales_Amount'].sum()
-    total_Profi = df_filtered['Profi'].sum()
-    avg_margin = df_filtered['Profi_Marge'].mean()
+    total_Profit = df_filtered['Profit'].sum()
+    avg_margin = df_filtered['Profit_Margin'].mean()
     total_transactions = len(df_filtered)
     
     quick_col1.metric("Ventes Totales", f"${total_sales:,.0f}")
-    quick_col2.metric("Profi Total", f"${total_Profi:,.0f}")
+    quick_col2.metric("Profit Total", f"${total_Profit:,.0f}")
     quick_col3.metric("Marge Moyenne", f"{avg_margin:.1f}%")
     quick_col4.metric("Transactions", f"{total_transactions:,}")
 
@@ -571,8 +571,8 @@ elif "Tableau de Bord" in nav_selection:
     with col2:
         card_metric("Commandes", f"{len(df_filtered):,}", -2.4)
     with col3:
-        Profi = df_filtered['Profi'].sum()
-        margin = (Profi / df_filtered['Sales_Amount'].sum()) * 100
+        Profit = df_filtered['Profit'].sum()
+        margin = (Profit / df_filtered['Sales_Amount'].sum()) * 100
         card_metric("Marge Nette", f"{margin:.1f}", 5.3, suffix="%")
     with col4:
         avg_basket = df_filtered['Sales_Amount'].mean()
@@ -583,7 +583,7 @@ elif "Tableau de Bord" in nav_selection:
     
     with col_main:
         def plot_sales_trend(height):
-            daily = df_filtered.groupby('Sale_Date')[['Sales_Amount', 'Profi']].sum().reset_index()
+            daily = df_filtered.groupby('Sale_Date')[['Sales_Amount', 'Profit']].sum().reset_index()
             daily['MA7'] = daily['Sales_Amount'].rolling(7).mean()
             
             fig = go.Figure()
@@ -594,10 +594,10 @@ elif "Tableau de Bord" in nav_selection:
                 line=dict(color='#3498DB', width=1),
                 fillcolor='rgba(52, 152, 219, 0.1)'
             ))
-            # Ligne de tendance (Profi)
+            # Ligne de tendance (Profit)
             fig.add_trace(go.Scatter(
-                x=daily['Sale_Date'], y=daily['Profi'],
-                mode='lines', name='Profi',
+                x=daily['Sale_Date'], y=daily['Profit'],
+                mode='lines', name='Profit',
                 line=dict(color='#2ECC71', width=2)
             ))
             
@@ -611,7 +611,7 @@ elif "Tableau de Bord" in nav_selection:
             )
             st.plotly_chart(fig, use_container_width=True)
             
-        card_chart_wrapper("Évolution Ventes & Profi (YTD)", plot_sales_trend, height=380)
+        card_chart_wrapper("Évolution Ventes & Profit (YTD)", plot_sales_trend, height=380)
 
     with col_side:
         # Liste stylisée des meilleures catégories
@@ -683,8 +683,8 @@ elif "Analyse Détaillée" in nav_selection:
             card_chart_wrapper("Distribution des Prix Unitaires", 
                                lambda height: st.plotly_chart(px.histogram(df_filtered, x="Unit_Price", nbins=30, color_discrete_sequence=['#3498DB']).update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
         with col2:
-            card_chart_wrapper("Distribution des Profis", 
-                               lambda height: st.plotly_chart(px.box(df_filtered, x="Product_Category", y="Profi", color="Product_Category").update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
+            card_chart_wrapper("Distribution des Profits", 
+                               lambda height: st.plotly_chart(px.box(df_filtered, x="Product_Category", y="Profit", color="Product_Category").update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True))
     
     with tabs[1]:
         # Heatmap de corrélation
@@ -702,7 +702,7 @@ elif "Analyse Détaillée" in nav_selection:
         # Scatter Plot interactif
         col_x, col_y, col_c = st.columns(3)
         with col_x: x_axis = st.selectbox("Axe X", numeric_cols, index=0)
-        with col_y: y_axis = st.selectbox("Axe Y", numeric_cols, index=4) # Profi default
+        with col_y: y_axis = st.selectbox("Axe Y", numeric_cols, index=4) # Profit default
         with col_c: color_var = st.selectbox("Couleur", ['Region', 'Product_Category'])
         
         fig = px.scatter(df_filtered, x=x_axis, y=y_axis, color=color_var, size='Quantity_Sold', 
@@ -758,14 +758,14 @@ elif "Géographie & Segments" in nav_selection:
         st.caption("Vue hiérarchique Région > Catégorie")
         
         fig_tree = px.treemap(df_filtered, path=['Region', 'Product_Category'], values='Sales_Amount',
-                              color='Profi', color_continuous_scale='RdBu')
+                              color='Profit', color_continuous_scale='RdBu')
         fig_tree.update_layout(height=500)
         st.plotly_chart(fig_tree, use_container_width=True)
         
     # Sunburst Chart
     st.markdown("---")
     st.subheader("Vue Radiale des Ventes")
-    fig_sun = px.sunburst(df_filtered, path=['Region', 'Product_Category', 'Region_and_Sales_Rep'], values='Sales_Amount', color='Profi')
+    fig_sun = px.sunburst(df_filtered, path=['Region', 'Product_Category', 'Region_and_Sales_Rep'], values='Sales_Amount', color='Profit')
     fig_sun.update_layout(height=600)
     st.plotly_chart(fig_sun, use_container_width=True)
 
@@ -776,7 +776,7 @@ elif "Simulateur IA" in nav_selection:
     st.markdown("""
     <div class="nexus-card">
         <h3 style="color:var(--primary)">🔮 Simulateur de Scénarios</h3>
-        <p>Modifiez les paramètres ci-dessous pour voir l'impact projeté sur la marge et le Profi global.</p>
+        <p>Modifiez les paramètres ci-dessous pour voir l'impact projeté sur la marge et le Profit global.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -799,8 +799,8 @@ elif "Simulateur IA" in nav_selection:
     with col_res:
         # Logique de simulation
         base_sales = df_filtered['Sales_Amount'].sum()
-        base_Profi = df_filtered['Profi'].sum()
-        base_cost = base_sales - base_Profi
+        base_Profit = df_filtered['Profit'].sum()
+        base_cost = base_sales - base_Profit
         
         # Application scénario
         new_sales_vol_factor = 1 + ((sim_vol_change + (sim_price_change * elasticity))/100)
@@ -809,7 +809,7 @@ elif "Simulateur IA" in nav_selection:
         
         projected_sales = base_sales * new_sales_vol_factor * new_price_factor
         projected_costs = base_cost * new_sales_vol_factor * new_cost_factor
-        projected_Profi = projected_sales - projected_costs
+        projected_Profit = projected_sales - projected_costs
         
         # Affichage résultats
         c1, c2, c3 = st.columns(3)
@@ -818,16 +818,16 @@ elif "Simulateur IA" in nav_selection:
         with c2:
             st.metric("Coûts Projetés", f"${projected_costs:,.0f}", f"{(projected_costs/base_cost - 1)*100:.1f}%", delta_color="inverse")
         with c3:
-            st.metric("Profi Projeté", f"${projected_Profi:,.0f}", f"{(projected_Profi/base_Profi - 1)*100:.1f}%")
+            st.metric("Profit Projeté", f"${projected_Profit:,.0f}", f"{(projected_Profit/base_Profit - 1)*100:.1f}%")
             
         # Graphique Waterfall
         fig = go.Figure(go.Waterfall(
             name = "20", orientation = "v",
             measure = ["relative", "relative", "relative", "total"],
-            x = ["Base Profi", "Impact Prix/Vol", "Impact Coûts", "Nouveau Profi"],
+            x = ["Base Profit", "Impact Prix/Vol", "Impact Coûts", "Nouveau Profit"],
             textposition = "outside",
-            text = [f"{base_Profi/1000:.0f}k", "", "", f"{projected_Profi/1000:.0f}k"],
-            y = [base_Profi, projected_sales - base_sales - (projected_costs - base_cost) + (projected_costs - base_cost), -(projected_costs - base_cost), projected_Profi],
+            text = [f"{base_Profit/1000:.0f}k", "", "", f"{projected_Profit/1000:.0f}k"],
+            y = [base_Profit, projected_sales - base_sales - (projected_costs - base_cost) + (projected_costs - base_cost), -(projected_costs - base_cost), projected_Profit],
             connector = {"line":{"color":"rgb(63, 63, 63)"}},
         ))
         fig.update_layout(title = "Analyse d'impact du scénario (Waterfall)", height=400)
@@ -908,8 +908,8 @@ elif "Machine Learning" in nav_selection:
                                 'DayOfYear': [current_date.timetuple().tm_yday],
                                 'Week': [current_date.isocalendar()[1]],
                                 'Total_Cost': [quantity * unit_cost],
-                                'Profi': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
-                                'Profi_Marge': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
+                                'Profit': [quantity * (unit_price - unit_cost) * (1 - discount/100)],
+                                'Profit_Margin': [((unit_price - unit_cost) / unit_price * 100) if unit_price > 0 else 0],
                                 'Cum_Sales_By_Point': [0],
                                 
                                 # Encoded features (dans l'ordre exact)
@@ -941,11 +941,11 @@ elif "Machine Learning" in nav_selection:
                                 
                                 revenue = quantity * unit_price * (1 - discount/100)
                                 cost = quantity * unit_cost
-                                Profi = revenue - cost
-                                margin = (Profi / revenue * 100) if revenue > 0 else 0
+                                Profit = revenue - cost
+                                margin = (Profit / revenue * 100) if revenue > 0 else 0
                                 
                                 detail_col1.metric("Revenu Calculé", f"${revenue:,.2f}")
-                                detail_col2.metric("Profi Estimé", f"${Profi:,.2f}")
+                                detail_col2.metric("Profit Estimé", f"${Profit:,.2f}")
                                 detail_col3.metric("Marge", f"{margin:.1f}%")
                                 
                             except Exception as e:
