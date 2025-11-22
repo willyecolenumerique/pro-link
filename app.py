@@ -544,18 +544,6 @@ if "Accueil" in nav_selection:
         <h3 style='color: #2C3E50; margin: 50px 0 25px 0; font-weight: 400; font-size: 22px; 
                    border-bottom: 2px solid #ECF0F1; padding-bottom: 15px;'>Indicateurs Globaux</h3>
     """, unsafe_allow_html=True)
-    
-    quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
-    
-    total_sales = df_filtered['Sales_Amount'].sum()
-    total_Profit = df_filtered['Profit'].sum()
-    avg_margin = df_filtered['Profit_Margin'].mean()
-    total_transactions = len(df_filtered)
-    
-    quick_col1.metric("Ventes Totales", f"${total_sales:,.0f}")
-    quick_col2.metric("Profit Total", f"${total_Profit:,.0f}")
-    quick_col3.metric("Marge Moyenne", f"{avg_margin:.1f}%")
-    quick_col4.metric("Transactions", f"{total_transactions:,}")
 
 # =============================================================================
 # PAGE 1: TABLEAU DE BORD (SUMMARY)
